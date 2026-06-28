@@ -292,8 +292,7 @@
         'header',
         'nav',
     ];
-    let navEl = null;        // cached reference to LinkedIn's top nav
-    let navObserver = null;  // watches the nav so a reset is instantly undone
+    const watchedNavs = new WeakSet(); // navs we've attached an observer to
 
     function setNavTop(el) {
         if (getComputedStyle(el).top !== CONFIG.barHeight + 'px') {
@@ -301,46 +300,36 @@
         }
     }
 
-    // Find LinkedIn's fixed/sticky full-width top bar by geometry (no reliance
-    // on class names) and return it.
-    function findTopNav() {
+    // Offset EVERY full-width fixed/sticky bar pinned to the very top (not just
+    // the first match — LinkedIn's real nav isn't always the first candidate).
+    // Geometry-based, so it doesn't depend on class names. The width + top gates
+    // exclude the bottom-right messaging widget and side rails. Each matched nav
+    // also gets a scoped attribute observer, because LinkedIn resets the nav's
+    // top via a style/class change WITHOUT a childList mutation, which the
+    // page-wide childList observer would otherwise miss.
+    function offsetTopNav() {
         const vw = window.innerWidth;
         const bar = CONFIG.barHeight;
         const seen = new Set();
-        for (const sel of NAV_SELECTORS) {
-            for (const el of document.querySelectorAll(sel)) {
-                if (seen.has(el)) continue;
+        NAV_SELECTORS.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                if (seen.has(el)) return;
                 seen.add(el);
                 const pos = getComputedStyle(el).position;
-                if (pos !== 'fixed' && pos !== 'sticky') continue;
+                if (pos !== 'fixed' && pos !== 'sticky') return;
                 const r = el.getBoundingClientRect();
-                // A wide bar pinned to the very top (excludes the bottom-right
-                // messaging widget and side rails); also matches our own offset
-                // idempotently (top already == bar).
                 const spansWidth = r.width >= vw * 0.6;
                 const pinnedTop = r.top <= 1 || Math.abs(r.top - bar) < 2;
-                if (spansWidth && pinnedTop) return el;
-            }
-        }
-        return null;
-    }
-
-    function offsetTopNav() {
-        const el = findTopNav();
-        if (!el) return;
-        setNavTop(el);
-        if (el !== navEl) {
-            // New nav node (e.g. LinkedIn re-rendered it on SPA nav): re-point
-            // our dedicated observer at it. LinkedIn resets the nav's top via a
-            // style/class change WITHOUT a childList mutation, so the page-wide
-            // observer misses it — this scoped one catches it and re-asserts.
-            navEl = el;
-            if (navObserver) navObserver.disconnect();
-            navObserver = new MutationObserver(() => {
-                if (navEl && navEl.isConnected) setNavTop(navEl);
+                if (!spansWidth || !pinnedTop) return;
+                setNavTop(el);
+                if (!watchedNavs.has(el)) {
+                    watchedNavs.add(el);
+                    new MutationObserver(() => {
+                        if (el.isConnected) setNavTop(el);
+                    }).observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
+                }
             });
-            navObserver.observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
-        }
+        });
     }
 
     // Re-assert the offset several times right after a route change, to win the

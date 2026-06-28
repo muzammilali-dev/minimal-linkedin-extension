@@ -4,6 +4,21 @@
   "version": "2.0",
   "description": "Hides the LinkedIn feed and adds a persistent launcher bar that deep-links to Messages and the LinkedIn games.",
 
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+
+  "action": {
+    "default_title": "Minimal LinkedIn",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+
   "host_permissions": [
     "*://*.linkedin.com/*"
   ],
