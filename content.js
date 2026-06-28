@@ -30,59 +30,70 @@
     // SECTION 1 — Feed hiding (preserved from the original extension).
     // Behavior intentionally unchanged; only re-indented into this section.
     // =========================================================================
+    // True only on the home/feed page, where the central column IS the feed.
+    function isFeedPath() {
+        const p = window.location.pathname;
+        return p === '/' || p === '/feed' || p === '/feed/';
+    }
+
     function hideFeed() {
-        // Main feed container selectors (LinkedIn updates these occasionally)
+        // --- Structural hide (robust): on the feed page the central column is
+        // the feed itself. Hide every child of <main> except our own message,
+        // instead of chasing LinkedIn's churn-prone post/container class names.
+        // The side columns are <aside>/<section> siblings outside <main>, so
+        // they (and the nav) stay visible. On non-feed pages <main> is left
+        // alone so profiles, messaging, games, etc. work normally.
+        if (isFeedPath()) {
+            const main = document.querySelector('main');
+            if (main) {
+                Array.from(main.children).forEach(child => {
+                    if (!child.classList.contains('feed-blocked-message')) {
+                        child.style.display = 'none';
+                    }
+                });
+                addFeedBlockedMessage(main);
+            }
+        }
+
+        // --- Class-based hide (belt-and-suspenders): kill stray promoted/feed
+        // posts that can surface on non-feed pages too. Selectors here are the
+        // ones LinkedIn renames occasionally — see README's "where to look".
         const feedSelectors = [
             '[data-chameleon-result-urn*="update"]',
             '.feed-shared-update-v2',
             '.occludable-update',
             'div[data-id*="urn:li:activity"]',
-            '.scaffold-finite-scroll__content > div',
-            'main .scaffold-finite-scroll',
-            '[role="main"] .scaffold-finite-scroll'
+            'div[data-urn*="urn:li:activity"]'
         ];
-
         feedSelectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach(el => {
+            document.querySelectorAll(selector).forEach(el => {
                 if (el && !el.classList.contains('feed-blocked')) {
                     el.style.display = 'none';
                     el.classList.add('feed-blocked');
                 }
             });
         });
-
-        const feedContainer = document.querySelector('main .scaffold-finite-scroll');
-        if (feedContainer && window.location.pathname === '/feed/') {
-            feedContainer.style.display = 'none';
-        }
-
-        addFeedBlockedMessage();
     }
 
-    function addFeedBlockedMessage() {
-        if (window.location.pathname === '/feed/' && !document.querySelector('.feed-blocked-message')) {
-            const main = document.querySelector('main');
-            if (main) {
-                const message = document.createElement('div');
-                message.className = 'feed-blocked-message';
-                message.innerHTML = `
-                    <div style="
-                        text-align: center;
-                        padding: 40px 20px;
-                        background: #f3f2ef;
-                        border-radius: 8px;
-                        margin: 20px;
-                        color: #666;
-                    ">
-                        <h2 style="color: #0077b5; margin-bottom: 10px;">📵 LinkedIn Feed Blocked</h2>
-                        <p>Your feed is hidden to help you stay focused!</p>
-                        <p>Use the launcher bar above for Messages and games.</p>
-                    </div>
-                `;
-                main.appendChild(message);
-            }
-        }
+    function addFeedBlockedMessage(main) {
+        if (!main || main.querySelector(':scope > .feed-blocked-message')) return;
+        const message = document.createElement('div');
+        message.className = 'feed-blocked-message';
+        message.innerHTML = `
+            <div style="
+                text-align: center;
+                padding: 40px 20px;
+                background: #f3f2ef;
+                border-radius: 8px;
+                margin: 20px;
+                color: #666;
+            ">
+                <h2 style="color: #0077b5; margin-bottom: 10px;">📵 LinkedIn Feed Blocked</h2>
+                <p>Your feed is hidden to help you stay focused!</p>
+                <p>Use the launcher bar above for Messages and games.</p>
+            </div>
+        `;
+        main.appendChild(message);
     }
 
     function preserveImportantElements() {
@@ -239,40 +250,37 @@
     // =========================================================================
     // SECTION 3 — SPA navigation handling.
     // LinkedIn is a single-page app; route changes go through the History API
-    // rather than full page loads. Patch pushState/replaceState and listen for
-    // popstate so we re-assert the launcher + feed hiding on client-side nav.
+    // rather than full page loads. NOTE: a content script runs in an isolated
+    // world, so monkey-patching history.pushState here would NOT intercept
+    // LinkedIn's own navigations. Instead we POLL location.href (driven by the
+    // MutationObserver and the interval), which works regardless of who called
+    // pushState. popstate (back/forward) is also handled directly.
     // =========================================================================
-    function emitLocationChange() {
-        window.dispatchEvent(new Event('mlb:locationchange'));
+    let lastHref = location.href;
+
+    function onLocationChange() {
+        ensureLauncher();
+        setActive();
+        hideFeed();
+        preserveImportantElements();
     }
 
-    function hookHistory() {
-        const wrap = (name) => {
-            const original = history[name];
-            history[name] = function () {
-                const result = original.apply(this, arguments);
-                emitLocationChange();
-                return result;
-            };
-        };
-        wrap('pushState');
-        wrap('replaceState');
-        window.addEventListener('popstate', emitLocationChange);
-
-        window.addEventListener('mlb:locationchange', () => {
-            ensureLauncher();
-            setActive();
-            hideFeed();
-            preserveImportantElements();
-        });
+    // Fire onLocationChange only when the URL actually changed.
+    function checkLocation() {
+        if (location.href !== lastHref) {
+            lastHref = location.href;
+            onLocationChange();
+        }
     }
 
     // =========================================================================
     // SECTION 4 — Boot.
     // =========================================================================
     const observer = new MutationObserver(function (mutations) {
-        // Cheap self-heal on every batch: re-add launcher if missing.
+        // Cheap self-heal on every batch: re-add launcher if missing, and
+        // catch SPA URL changes (LinkedIn mutates the DOM as it routes).
         ensureLauncher();
+        checkLocation();
         if (mutations.some(m => m.addedNodes.length > 0)) {
             setTimeout(() => {
                 hideFeed();
@@ -292,11 +300,12 @@
         hideFeed();
         preserveImportantElements();
         startObserver();
-        hookHistory();
+        window.addEventListener('popstate', checkLocation);
 
-        // Backup re-assert, same cadence as the original extension.
+        // Backup re-assert + URL poll, same cadence as the original extension.
         setInterval(() => {
             ensureLauncher();
+            checkLocation();
             hideFeed();
             preserveImportantElements();
         }, 2000);
