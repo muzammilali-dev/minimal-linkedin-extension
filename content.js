@@ -255,22 +255,34 @@
     // every tick because LinkedIn re-renders can reset inline styles. If this
     // ever stops working, the nav overlap is the only regression and this is
     // the function to update.
+    // Class-name hints, tried first for speed; the geometry scan below is the
+    // real safety net and works even if every one of these is renamed.
     const NAV_SELECTORS = [
         '#global-nav',
         '.global-nav',
         '[class*="global-nav"]',
         'header[role="banner"]',
-        '.scaffold-layout__inner > header',
+        'header',
+        'nav',
     ];
     function offsetTopNav() {
+        const vw = window.innerWidth;
+        const bar = CONFIG.barHeight;
         const seen = new Set();
         NAV_SELECTORS.forEach(sel => {
             document.querySelectorAll(sel).forEach(el => {
                 if (seen.has(el)) return;
                 seen.add(el);
                 const pos = getComputedStyle(el).position;
-                if (pos === 'fixed' || pos === 'sticky') {
-                    el.style.setProperty('top', CONFIG.barHeight + 'px', 'important');
+                if (pos !== 'fixed' && pos !== 'sticky') return;
+                const r = el.getBoundingClientRect();
+                // Only touch a wide bar pinned to the very top (the global nav).
+                // Excludes the bottom-right messaging widget and side rails, and
+                // re-affirms our own offset idempotently (top already == bar).
+                const spansWidth = r.width >= vw * 0.6;
+                const pinnedTop = r.top <= 1 || Math.abs(r.top - bar) < 2;
+                if (spansWidth && pinnedTop) {
+                    el.style.setProperty('top', bar + 'px', 'important');
                 }
             });
         });
