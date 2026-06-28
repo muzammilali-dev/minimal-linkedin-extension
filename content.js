@@ -25,6 +25,29 @@
 
     const HOST_ID = 'minimal-linkedin-launcher-host';   // our shadow host
     const OFFSET_STYLE_ID = 'minimal-linkedin-offset';  // light-DOM layout offset
+    const FEEDHIDE_STYLE_ID = 'minimal-linkedin-feedhide'; // anti-flash pre-hide
+
+    // Inject (or remove) a CSS rule that pre-hides the feed column the instant
+    // <main> renders, so the real feed never flashes before our JS runs. Runs at
+    // document_start and is toggled per route (only active on the feed page).
+    // Keeps our injected message visible; nothing else in <main> paints.
+    function setFeedHideStyle() {
+        const existing = document.getElementById(FEEDHIDE_STYLE_ID);
+        if (isFeedPath()) {
+            if (!existing) {
+                const el = document.createElement('style');
+                el.id = FEEDHIDE_STYLE_ID;
+                el.textContent =
+                    'main > *:not(.feed-blocked-message){display:none !important;}';
+                (document.head || document.documentElement).appendChild(el);
+            }
+        } else if (existing) {
+            existing.remove();
+        }
+    }
+
+    // Apply immediately at document_start (before <main> paints).
+    setFeedHideStyle();
 
     // =========================================================================
     // SECTION 1 — Feed hiding (preserved from the original extension).
@@ -37,6 +60,9 @@
     }
 
     function hideFeed() {
+        // Keep the anti-flash pre-hide rule in sync with the current route.
+        setFeedHideStyle();
+
         // --- Structural hide (robust): on the feed page the central column is
         // the feed itself. Hide every child of <main> except our own message,
         // instead of chasing LinkedIn's churn-prone post/container class names.

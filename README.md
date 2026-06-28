@@ -70,10 +70,14 @@ To add, remove, or rename a button, edit the `CONFIG.links` array at the top of
 
 - **Manifest V3** content script + stylesheet injected on `*://*.linkedin.com/*`
   at `document_start`. No background service worker, no remote code.
-- **Feed hiding** (`styles.css` + the feed functions in `content.js`) is the
-  original extension's approach: CSS hides known feed selectors immediately, and
-  a MutationObserver + interval re-applies it as LinkedIn loads content
-  dynamically.
+- **Feed hiding** is structural rather than class-based: on the feed page
+  (`/feed/` or `/`) it hides the children of `<main>` (the central feed column)
+  except the injected "Feed Blocked" message, so it doesn't depend on LinkedIn's
+  churn-prone post class names. A path-aware CSS rule injected at
+  `document_start` pre-hides the column so the real feed never flashes before the
+  JS runs, and a MutationObserver + interval re-apply everything as LinkedIn
+  loads content dynamically. The original class-based selectors are kept as a
+  secondary sweep for stray promoted posts on other pages.
 - **Launcher** is injected as a Shadow DOM host appended to `<html>` — a sibling
   of LinkedIn's app root — so it is isolated from LinkedIn's CSS and untouched by
   LinkedIn's re-renders.
@@ -96,8 +100,10 @@ LinkedIn updates its markup periodically. If something breaks:
 - **Top spacing is wrong / LinkedIn's nav is overlapped** → the `applyOffset()`
   rules in `content.js` (`html { padding-top }` and the single
   `.global-nav { top }` coupling).
-- **The feed reappears** → the feed selectors in `styles.css` and the
-  `feedSelectors` array in `content.js` (same maintenance surface as upstream).
+- **The feed reappears** → the structural hide in `hideFeed()` /
+  `setFeedHideStyle()` in `content.js` (it targets `<main>`'s children; if
+  LinkedIn moves the feed out of `<main>`, adjust there). The `feedSelectors`
+  array is the secondary class-based sweep.
 - **The launcher disappears after navigating** → `ensureLauncher()` and the
   History API hook (`hookHistory()`) in `content.js`.
 
