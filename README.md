@@ -43,11 +43,12 @@ To add, remove, or rename a button, edit the `CONFIG.links` array at the top of
 
 ## Installation (Load unpacked in Chrome)
 
-1. Download or clone this repository.
+1. Download or clone this repository:
+   `git clone https://github.com/muzammilali/minimal-linkedin-extension.git`
 2. Open Chrome and go to `chrome://extensions/`.
 3. Toggle **Developer mode** on (top-right).
 4. Click **Load unpacked**.
-5. Select this `minimal-linkedin` folder.
+5. Select the folder you just cloned/downloaded.
 6. Open or refresh a LinkedIn tab — the launcher bar appears at the top and the
    feed is hidden.
 
