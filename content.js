@@ -187,11 +187,31 @@
                 overflow-x: auto;
             }
             .mlb-brand {
-                color: #70b5f9;
+                display: inline-flex;
+                align-items: center;
+                color: #ffffff;
                 font-weight: 700;
-                margin-right: 8px;
+                font-size: 15px;
+                letter-spacing: -0.2px;
+                margin-right: 10px;
                 white-space: nowrap;
                 flex: 0 0 auto;
+            }
+            /* The "in" of "Minimal" rendered as the LinkedIn logo badge. */
+            .mlb-li {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+                height: 16px;
+                padding: 0 3px;
+                margin: 0 0.5px;
+                background: #0a66c2;
+                color: #ffffff;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 700;
+                line-height: 1;
             }
             .mlb-link {
                 pointer-events: auto;
@@ -212,9 +232,16 @@
         const bar = document.createElement('div');
         bar.className = 'mlb-bar';
 
+        // Brand: "Minimal" with the "in" drawn as the LinkedIn logo badge.
         const brand = document.createElement('span');
         brand.className = 'mlb-brand';
-        brand.textContent = 'Minimal LinkedIn';
+        brand.setAttribute('aria-label', 'Minimal LinkedIn');
+        brand.append('M');
+        const li = document.createElement('span');
+        li.className = 'mlb-li';
+        li.textContent = 'in';
+        brand.append(li);
+        brand.append('imal');
         bar.appendChild(brand);
 
         CONFIG.links.forEach(({ label, url }) => {
