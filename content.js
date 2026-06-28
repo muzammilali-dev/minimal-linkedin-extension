@@ -233,24 +233,47 @@
         document.documentElement.appendChild(host);
 
         applyOffset();
+        offsetTopNav();
         setActive();
     }
 
-    // Push the page down so the bar doesn't cover LinkedIn's own fixed nav.
-    // SINGLE coupling point to a LinkedIn class: `.global-nav { top }`. If that
-    // class is ever renamed, only the ~barHeight px of top spacing regresses
-    // (cosmetic) — the launcher keeps working. To drop all coupling, delete the
-    // `.global-nav` rule and dock the bar in a corner instead (set the host's
-    // CSS to top:auto; right:0; bottom:0 in buildLauncher()).
+    // Push the whole page down by the bar height so our bar doesn't cover
+    // content. LinkedIn's own top nav is position:fixed, so padding can't move
+    // it — offsetTopNav() handles that separately.
     function applyOffset() {
         if (document.getElementById(OFFSET_STYLE_ID)) return;
         const offset = document.createElement('style');
         offset.id = OFFSET_STYLE_ID;
-        offset.textContent = `
-            html { padding-top: ${CONFIG.barHeight}px !important; }
-            .global-nav { top: ${CONFIG.barHeight}px !important; }
-        `;
+        offset.textContent = `html { padding-top: ${CONFIG.barHeight}px !important; }`;
         (document.head || document.documentElement).appendChild(offset);
+    }
+
+    // Move LinkedIn's fixed top nav down so it isn't hidden behind our bar.
+    // This is the one place we touch LinkedIn's own chrome: we try several
+    // reasonably stable selectors and only nudge an element that is actually
+    // fixed/sticky (so we never shift unrelated in-flow elements). Re-applied
+    // every tick because LinkedIn re-renders can reset inline styles. If this
+    // ever stops working, the nav overlap is the only regression and this is
+    // the function to update.
+    const NAV_SELECTORS = [
+        '#global-nav',
+        '.global-nav',
+        '[class*="global-nav"]',
+        'header[role="banner"]',
+        '.scaffold-layout__inner > header',
+    ];
+    function offsetTopNav() {
+        const seen = new Set();
+        NAV_SELECTORS.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                if (seen.has(el)) return;
+                seen.add(el);
+                const pos = getComputedStyle(el).position;
+                if (pos === 'fixed' || pos === 'sticky') {
+                    el.style.setProperty('top', CONFIG.barHeight + 'px', 'important');
+                }
+            });
+        });
     }
 
     // Highlight the button matching the current page.
@@ -271,6 +294,7 @@
         } else {
             applyOffset();
         }
+        offsetTopNav();
     }
 
     // =========================================================================

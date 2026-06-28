@@ -97,9 +97,9 @@ LinkedIn updates its markup periodically. If something breaks:
 
 - **A game/Messages link 404s or moved** → `CONFIG.links` at the top of
   `content.js`.
-- **Top spacing is wrong / LinkedIn's nav is overlapped** → the `applyOffset()`
-  rules in `content.js` (`html { padding-top }` and the single
-  `.global-nav { top }` coupling).
+- **Top spacing is wrong / LinkedIn's nav is overlapped** → `applyOffset()`
+  (page push-down) and `offsetTopNav()` / the `NAV_SELECTORS` list in
+  `content.js` (the selectors used to find and lower LinkedIn's fixed nav).
 - **The feed reappears** → the structural hide in `hideFeed()` /
   `setFeedHideStyle()` in `content.js` (it targets `<main>`'s children; if
   LinkedIn moves the feed out of `<main>`, adjust there). The `feedSelectors`
