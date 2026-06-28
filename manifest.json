@@ -1,13 +1,13 @@
 {
-  "manifest_version": 2,
-  "name": "LinkedIn Feed Blocker",
-  "version": "1.0",
-  "description": "Blocks the LinkedIn feed while keeping other functionality intact",
-  
-  "permissions": [
+  "manifest_version": 3,
+  "name": "Minimal LinkedIn",
+  "version": "2.0",
+  "description": "Hides the LinkedIn feed and adds a persistent launcher bar that deep-links to Messages and the LinkedIn games.",
+
+  "host_permissions": [
     "*://*.linkedin.com/*"
   ],
-  
+
   "content_scripts": [
     {
       "matches": ["*://*.linkedin.com/*"],
@@ -15,11 +15,5 @@
       "css": ["styles.css"],
       "run_at": "document_start"
     }
-  ],
-  
-  "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  }
+  ]
 }
