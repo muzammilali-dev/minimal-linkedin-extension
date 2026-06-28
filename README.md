@@ -44,7 +44,7 @@ To add, remove, or rename a button, edit the `CONFIG.links` array at the top of
 ## Installation (Load unpacked in Chrome)
 
 1. Download or clone this repository:
-   `git clone https://github.com/muzammilali/minimal-linkedin-extension.git`
+   `git clone https://github.com/muzammilali-dev/minimal-linkedin-extension.git`
 2. Open Chrome and go to `chrome://extensions/`.
 3. Toggle **Developer mode** on (top-right).
 4. Click **Load unpacked**.
