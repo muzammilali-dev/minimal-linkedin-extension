@@ -1,126 +1,111 @@
-# LinkedIn Feed Blocker
+# Minimal LinkedIn
 
-A browser extension that blocks LinkedIn's distracting feed while preserving essential functionality like messaging, notifications, and profile access. Stay focused on professional networking without the endless scroll.
+A Chrome extension (Manifest V3) that strips LinkedIn down to the parts worth
+using. It does two things:
+
+1. **Hides the distracting feed** while preserving messaging, notifications, and
+   profile access.
+2. **Adds a small persistent launcher bar** to the top of every LinkedIn page
+   with one-click deep links to your Messages and the LinkedIn games.
+
+> Forked from and built on top of
+> [**linkedin-feed-blocker**](https://github.com/magdyksaleh/linkedin-feed-blocker)
+> by **Magdy Saleh** (MIT License). The original feed-hiding behavior is
+> preserved; this fork adds Manifest V3 support and the launcher bar.
 
 ## Features
 
-- ✅ Blocks LinkedIn feed posts and updates
-- ✅ Hides sponsored content and ads
-- ✅ Removes "People you may know" suggestions
-- ✅ Preserves messaging functionality
-- ✅ Keeps notifications working
-- ✅ Maintains profile and connection pages
-- ✅ Shows friendly blocked message on feed page
-- ✅ Works with LinkedIn's dynamic content loading
+- ✅ Hides LinkedIn feed posts, sponsored content, ads, and "People you may know"
+- ✅ Persistent launcher bar on every page — survives LinkedIn's in-app (SPA) navigation
+- ✅ One-click links to Messages, Queens, Tango, Pinpoint, Crossclimb, Zip, and Wend
+- ✅ Highlights the button for the page you're currently on
+- ✅ Manifest V3, runs entirely locally — no analytics, no network calls
+- ✅ Only permission is `linkedin.com`
+- ✅ Launcher rendered in a Shadow DOM, so LinkedIn's CSS can't break it (and vice versa)
 
-## Installation
+## The launcher links
 
-### Chrome/Chromium/Edge
+All game URLs were verified live before shipping. They live in a single
+`CONFIG` object at the top of `content.js` — edit there if anything changes.
 
-1. Download or clone this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" (toggle in top right)
-4. Click "Load unpacked"
-5. Select the `linkedin-feed-blocker` folder
-6. The extension will be installed and active immediately
+| Button     | URL |
+|------------|-----|
+| Messages   | https://www.linkedin.com/messaging/ |
+| Queens     | https://www.linkedin.com/games/queens/ |
+| Tango      | https://www.linkedin.com/games/tango/ |
+| Pinpoint   | https://www.linkedin.com/games/pinpoint/ |
+| Crossclimb | https://www.linkedin.com/games/crossclimb/ |
+| Zip        | https://www.linkedin.com/games/zip/ |
+| Wend       | https://www.linkedin.com/games/wend/ |
 
-### Firefox
+To add, remove, or rename a button, edit the `CONFIG.links` array at the top of
+`content.js`. No other changes are needed.
 
-1. Download or clone this repository
-2. Open Firefox and navigate to `about:debugging`
-3. Click "This Firefox"
-4. Click "Load Temporary Add-on"
-5. Navigate to the extension folder and select `manifest.json`
-6. The extension will be loaded temporarily (until browser restart)
+## Installation (Load unpacked in Chrome)
 
-**Note for Firefox:** For permanent installation, the extension would need to be signed by Mozilla or installed as a developer extension.
+1. Download or clone this repository.
+2. Open Chrome and go to `chrome://extensions/`.
+3. Toggle **Developer mode** on (top-right).
+4. Click **Load unpacked**.
+5. Select this `minimal-linkedin` folder.
+6. Open or refresh a LinkedIn tab — the launcher bar appears at the top and the
+   feed is hidden.
 
-## How It Works
+> No icons are bundled, so Chrome shows a default puzzle-piece icon. That is
+> expected and harmless. To add your own, drop in `icon16/48/128.png` and add an
+> `"icons"` key to `manifest.json`.
 
-The extension uses a content script that runs on all LinkedIn pages (`*.linkedin.com/*`) and:
+## Manual test checklist
 
-1. **CSS Blocking**: Uses `styles.css` to immediately hide known feed elements
-2. **JavaScript Monitoring**: Runs `content.js` to:
-   - Hide feed posts using multiple selectors (LinkedIn changes these occasionally)
-   - Monitor for dynamically loaded content using MutationObserver
-   - Preserve important elements (navigation, messaging, notifications)
-   - Display a friendly message where the feed used to be
+- [ ] On `/feed/`, the feed is hidden and the "Feed Blocked" message shows.
+- [ ] The launcher bar is visible at the top of the LinkedIn home page.
+- [ ] All seven buttons are present with the correct labels.
+- [ ] Clicking each button navigates to the correct page.
+- [ ] Navigate around LinkedIn by clicking in-app links — the launcher **stays
+      put** and does not disappear (SPA navigation).
+- [ ] The button matching the current page is highlighted.
+- [ ] The DevTools console shows `Minimal LinkedIn: active` and **no errors**.
 
-### Technical Implementation
+## How it works
 
-- **Manifest Version**: Uses Manifest v2 (compatible with older browsers)
-- **Permissions**: Only requests access to `*.linkedin.com/*`
-- **Content Scripts**: Runs at `document_start` for immediate blocking
-- **No Background Scripts**: No persistent background processes
-- **No Network Requests**: All processing happens locally
+- **Manifest V3** content script + stylesheet injected on `*://*.linkedin.com/*`
+  at `document_start`. No background service worker, no remote code.
+- **Feed hiding** (`styles.css` + the feed functions in `content.js`) is the
+  original extension's approach: CSS hides known feed selectors immediately, and
+  a MutationObserver + interval re-applies it as LinkedIn loads content
+  dynamically.
+- **Launcher** is injected as a Shadow DOM host appended to `<html>` — a sibling
+  of LinkedIn's app root — so it is isolated from LinkedIn's CSS and untouched by
+  LinkedIn's re-renders.
+- **SPA resilience** comes from three layers: the structural placement above,
+  a self-healing `ensureLauncher()` guard, and a History API hook
+  (`pushState`/`replaceState`/`popstate`) that re-asserts the bar and feed
+  hiding on client-side route changes.
 
-## Security & Privacy
+## Privacy
 
-### Fully Local Operation
-- **No external servers**: Extension runs entirely in your browser
-- **No data collection**: No user data is collected, stored, or transmitted
-- **No network requests**: Extension doesn't make any HTTP requests
-- **No tracking**: No analytics or usage tracking
+Runs entirely in your browser. No data collected, no network requests, no
+tracking. Only host permission is `*://*.linkedin.com/*`.
 
-### Minimal Permissions
-- **Limited scope**: Only requests permission for `*.linkedin.com/*`
-- **No host permissions**: Cannot access other websites
-- **No storage permissions**: Doesn't store any data
-- **No tabs permissions**: Cannot access other browser tabs
+## When LinkedIn changes its DOM — where to look
 
-## What Gets Blocked
+LinkedIn updates its markup periodically. If something breaks:
 
-- Main LinkedIn feed posts and updates
-- Sponsored content and advertisements
-- "People you may know" suggestions
-- Activity updates from connections
-- Recommended content
+- **A game/Messages link 404s or moved** → `CONFIG.links` at the top of
+  `content.js`.
+- **Top spacing is wrong / LinkedIn's nav is overlapped** → the `applyOffset()`
+  rules in `content.js` (`html { padding-top }` and the single
+  `.global-nav { top }` coupling).
+- **The feed reappears** → the feed selectors in `styles.css` and the
+  `feedSelectors` array in `content.js` (same maintenance surface as upstream).
+- **The launcher disappears after navigating** → `ensureLauncher()` and the
+  History API hook (`hookHistory()`) in `content.js`.
 
-## What Stays Functional
+## Credits & License
 
-- Navigation bar and search
-- Messaging system
-- Notifications
-- Your profile and settings
-- Other users' profiles
-- Company pages
-- Job listings (when accessed directly)
-- Learning content (when accessed directly)
+- Original feed-blocking extension: **Magdy Saleh** —
+  [linkedin-feed-blocker](https://github.com/magdyksaleh/linkedin-feed-blocker).
+- Launcher feature and Manifest V3 migration: this fork.
 
-## Customization
-
-To modify what gets blocked, edit the selectors in:
-
-- `content.js`: Lines 8-16 (feedSelectors array)
-- `styles.css`: Lines 4-9 (CSS selectors)
-
-LinkedIn occasionally updates their HTML structure, so selectors may need updating.
-
-## Troubleshooting
-
-**Feed still showing?**
-- LinkedIn updates their selectors frequently
-- Check browser console for any JavaScript errors
-- Try disabling and re-enabling the extension
-
-**Important features broken?**
-- Check if elements are in the `keepVisible` array (content.js:68-76)
-- Verify CSS overrides in styles.css (lines 30-38)
-
-**Extension not loading?**
-- Ensure Developer mode is enabled
-- Check that all files are in the same directory
-- Look for errors in the Extensions page
-
-## Contributing
-
-To add new blocking rules or fix broken functionality:
-
-1. Inspect LinkedIn's HTML to find new selectors
-2. Add selectors to both `content.js` and `styles.css`
-3. Test with different LinkedIn page types
-4. Ensure essential features remain functional
-
-## License
-
-This project is open source and available under the MIT License.
+Released under the **MIT License** (see `LICENSE`), preserving the original
+copyright © 2025 Magdy Saleh.
