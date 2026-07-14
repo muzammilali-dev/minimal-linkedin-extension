@@ -301,6 +301,20 @@
         const vw = window.innerWidth;
         const bar = CONFIG.barHeight;
         const found = [];
+        const push = (el) => { if (el && found.indexOf(el) === -1) found.push(el); };
+
+        // (a) Explicit catch for LinkedIn's known nav ids/classes (confirmed:
+        // header#global-nav + div.global-nav__a11y-menu), regardless of size.
+        document.querySelectorAll('#global-nav, [class*="global-nav"]').forEach(el => {
+            const pos = getComputedStyle(el).position;
+            if (pos === 'fixed' || pos === 'sticky') {
+                const r = el.getBoundingClientRect();
+                if (r.top <= 1 || Math.abs(r.top - bar) < 2) push(el);
+            }
+        });
+
+        // (b) Geometry safety net — any short, full-width, top-pinned fixed bar,
+        // even if LinkedIn renames everything (tag/class agnostic).
         const all = document.body ? document.body.getElementsByTagName('*') : [];
         for (let i = 0; i < all.length; i++) {
             const el = all[i];
@@ -312,7 +326,7 @@
             if (r.height > 140) continue;                  // exclude full-page overlays
             const pinnedTop = r.top <= 1 || Math.abs(r.top - bar) < 2;
             if (!pinnedTop) continue;                      // exclude bottom/mid bars
-            found.push(el);
+            push(el);
         }
         return found;
     }
@@ -438,5 +452,5 @@
         init();
     }
 
-    console.log('Minimal LinkedIn: active');
+    console.log('Minimal LinkedIn: active (build 2.1)');
 })();
