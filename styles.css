@@ -1,64 +1,8 @@
-/* LinkedIn Feed Blocker Styles */
-
-/* Hide feed-related elements */
-.feed-shared-update-v2,
-.occludable-update,
-[data-chameleon-result-urn*="update"],
-div[data-id*="urn:li:activity"] {
-    display: none !important;
-}
-
-/* Hide the main feed container on homepage */
-body[class*="feed"] main .scaffold-finite-scroll {
-    display: none !important;
-}
-
-/* Hide sponsored content and ads */
-.ad-banner-container,
-.feed-shared-actor__sponsored-text,
-[data-test-id*="sponsored"],
-.promotional-card {
-    display: none !important;
-}
-
-/* Hide "People you may know" suggestions in feed */
-.pymk-carousel,
-.people-you-may-know {
-    display: none !important;
-}
-
-/* Keep navigation and essential elements visible */
-.global-nav,
-header,
-.msg-overlay-bubble-header,
-.notifications-overlay,
-.search-global-typeahead {
-    display: block !important;
-    visibility: visible !important;
-}
-
-/* Style for our custom blocked message */
-.feed-blocked-message {
-    animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Ensure profile pages and other important pages still work */
-.profile-photo-edit,
-.pv-profile-section,
-.pv-top-card,
-.experience-section,
-.education-section {
-    display: block !important;
-}
-
-/* Keep messaging functional */
-.msg-overlay-conversation-bubble,
-.msg-conversations-container,
-.msg-conversation-card {
-    display: block !important;
-}
+/* Minimal LinkedIn
+ *
+ * Feed hiding is done entirely from content.js: it injects a path-scoped rule
+ * (only on the home/feed page) that hides the center feed <section> while
+ * keeping the left/right <aside> rails and the top nav. Nothing is applied
+ * globally here, so other LinkedIn pages (profiles, messaging, games) are never
+ * affected. See content.js for the logic and the "where to look" notes.
+ */

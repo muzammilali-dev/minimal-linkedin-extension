@@ -1,118 +1,77 @@
 # Minimal LinkedIn
 
-A Chrome extension (Manifest V3) that strips LinkedIn down to the parts worth
-using. It does two things:
+A tiny Chrome extension (Manifest V3) that hides LinkedIn's distracting **home
+feed** while leaving everything useful in place:
 
-1. **Hides the distracting feed** while preserving messaging, notifications, and
-   profile access.
-2. **Adds a small persistent launcher bar** to the top of every LinkedIn page
-   with one-click deep links to your Messages and the LinkedIn games.
+- ✅ The **center feed is hidden** on the home page (`/feed/`)
+- ✅ The **left profile rail** stays (your profile, pages, etc.)
+- ✅ The **right rail** stays — including **"Today's puzzles"** (Queens, Tango,
+  Pinpoint, Crossclimb, Zip, Wend, Patches, Mini Sudoku)
+- ✅ The **top navigation** stays — Messaging, Notifications, Search, profile
+- ✅ Every other page works normally (profiles, messaging, games, jobs)
+- ✅ Manifest V3, runs entirely locally — no analytics, no network calls
+- ✅ Only permission is `linkedin.com`
+
+So you keep one-click access to **messages** (top nav) and the **games**
+(right-hand "Today's puzzles"), but the endless scroll is gone.
 
 > Forked from and built on top of
 > [**linkedin-feed-blocker**](https://github.com/magdyksaleh/linkedin-feed-blocker)
-> by **Magdy Saleh** (MIT License). The original feed-hiding behavior is
-> preserved; this fork adds Manifest V3 support and the launcher bar.
+> by **Magdy Saleh** (MIT License).
 
-## Features
+## How it works (and why it's robust)
 
-- ✅ Hides LinkedIn feed posts, sponsored content, ads, and "People you may know"
-- ✅ Persistent launcher bar on every page — survives LinkedIn's in-app (SPA) navigation
-- ✅ One-click links to Messages, Queens, Tango, Pinpoint, Crossclimb, Zip, and Wend
-- ✅ Highlights the button for the page you're currently on
-- ✅ Manifest V3, runs entirely locally — no analytics, no network calls
-- ✅ Only permission is `linkedin.com`
-- ✅ Launcher rendered in a Shadow DOM, so LinkedIn's CSS can't break it (and vice versa)
+LinkedIn obfuscates all of its CSS class names (e.g. `_5fb01c27`), so anything
+keyed to classes breaks constantly. This extension keys off **semantic HTML tags
+instead**, which LinkedIn does not rename:
 
-## The launcher links
+- The home page is a 3-column row inside `<main>`.
+- The **left and right rails are `<aside>`** elements.
+- The **center feed is a `<section>`**.
 
-All game URLs were verified live before shipping. They live in a single
-`CONFIG` object at the top of `content.js` — edit there if anything changes.
+So the rule is simply: *hide the `<section>` that sits alongside `<aside>`
+rails; keep the asides.* It's implemented as a `:has()` CSS rule
+(`main :has(> aside) > section`) injected only on the feed page, plus a
+JavaScript backup that re-applies on LinkedIn's single-page-app navigation. The
+CSS is injected at `document_start` so the feed never flashes before hiding.
 
-| Button     | URL |
-|------------|-----|
-| Messages   | https://www.linkedin.com/messaging/ |
-| Queens     | https://www.linkedin.com/games/queens/ |
-| Tango      | https://www.linkedin.com/games/tango/ |
-| Pinpoint   | https://www.linkedin.com/games/pinpoint/ |
-| Crossclimb | https://www.linkedin.com/games/crossclimb/ |
-| Zip        | https://www.linkedin.com/games/zip/ |
-| Wend       | https://www.linkedin.com/games/wend/ |
+Nothing is applied on non-feed pages, so profiles, messaging, and games are
+untouched.
 
-To add, remove, or rename a button, edit the `CONFIG.links` array at the top of
-`content.js`. No other changes are needed.
-
-## Installation (Load unpacked in Chrome)
+## Installation (Load unpacked)
 
 1. Download or clone this repository:
    `git clone https://github.com/muzammilali-dev/minimal-linkedin-extension.git`
-2. Open Chrome and go to `chrome://extensions/`.
+2. Open Chrome → `chrome://extensions/`.
 3. Toggle **Developer mode** on (top-right).
-4. Click **Load unpacked**.
-5. Select the folder you just cloned/downloaded.
-6. Open or refresh a LinkedIn tab — the launcher bar appears at the top and the
-   feed is hidden.
+4. Click **Load unpacked** and select the folder.
+5. Open or refresh a LinkedIn tab — the home feed is gone; everything else stays.
 
-> No icons are bundled, so Chrome shows a default puzzle-piece icon. That is
-> expected and harmless. To add your own, drop in `icon16/48/128.png` and add an
-> `"icons"` key to `manifest.json`.
+## Files
 
-## Manual test checklist
+| File | Purpose |
+|---|---|
+| `manifest.json` | MV3 manifest; injects the content script on `*.linkedin.com`. |
+| `content.js` | All the logic: identify + hide the feed `<section>`, handle SPA nav. |
+| `styles.css` | Intentionally empty (a comment) — hiding is done from `content.js`. |
+| `icon16/48/128.png` | Extension icons. |
 
-- [ ] On `/feed/`, the feed is hidden and the "Feed Blocked" message shows.
-- [ ] The launcher bar is visible at the top of the LinkedIn home page.
-- [ ] All seven buttons are present with the correct labels.
-- [ ] Clicking each button navigates to the correct page.
-- [ ] Navigate around LinkedIn by clicking in-app links — the launcher **stays
-      put** and does not disappear (SPA navigation).
-- [ ] The button matching the current page is highlighted.
-- [ ] The DevTools console shows `Minimal LinkedIn: active` and **no errors**.
+## When LinkedIn changes its DOM — where to look
 
-## How it works
-
-- **Manifest V3** content script + stylesheet injected on `*://*.linkedin.com/*`
-  at `document_start`. No background service worker, no remote code.
-- **Feed hiding** is structural rather than class-based: on the feed page
-  (`/feed/` or `/`) it hides the children of `<main>` (the central feed column)
-  except the injected "Feed Blocked" message, so it doesn't depend on LinkedIn's
-  churn-prone post class names. A path-aware CSS rule injected at
-  `document_start` pre-hides the column so the real feed never flashes before the
-  JS runs, and a MutationObserver + interval re-apply everything as LinkedIn
-  loads content dynamically. The original class-based selectors are kept as a
-  secondary sweep for stray promoted posts on other pages.
-- **Launcher** is injected as a Shadow DOM host appended to `<html>` — a sibling
-  of LinkedIn's app root — so it is isolated from LinkedIn's CSS and untouched by
-  LinkedIn's re-renders.
-- **SPA resilience** comes from three layers: the structural placement above,
-  a self-healing `ensureLauncher()` guard, and a History API hook
-  (`pushState`/`replaceState`/`popstate`) that re-asserts the bar and feed
-  hiding on client-side route changes.
+- **Feed reappears** → `content.js`: the `FEED_HIDE_CSS` rule and the
+  `hideFeed()` function. Both rely on the feed being a `<section>` beside
+  `<aside>` rails inside `<main>`. If LinkedIn changes those tags, adjust here.
+- **A side rail disappears** → the rails are expected to be `<aside>`; if one
+  becomes a `<section>`, the rule would hide it. Tighten `hideFeed()` in that case.
 
 ## Privacy
 
 Runs entirely in your browser. No data collected, no network requests, no
 tracking. Only host permission is `*://*.linkedin.com/*`.
 
-## When LinkedIn changes its DOM — where to look
-
-LinkedIn updates its markup periodically. If something breaks:
-
-- **A game/Messages link 404s or moved** → `CONFIG.links` at the top of
-  `content.js`.
-- **Top spacing is wrong / LinkedIn's nav is overlapped** → `applyOffset()`
-  (page push-down) and `offsetTopNav()` / the `NAV_SELECTORS` list in
-  `content.js` (the selectors used to find and lower LinkedIn's fixed nav).
-- **The feed reappears** → the structural hide in `hideFeed()` /
-  `setFeedHideStyle()` in `content.js` (it targets `<main>`'s children; if
-  LinkedIn moves the feed out of `<main>`, adjust there). The `feedSelectors`
-  array is the secondary class-based sweep.
-- **The launcher disappears after navigating** → `ensureLauncher()` and the
-  History API hook (`hookHistory()`) in `content.js`.
-
 ## Credits & License
 
 - Original feed-blocking extension: **Magdy Saleh** —
   [linkedin-feed-blocker](https://github.com/magdyksaleh/linkedin-feed-blocker).
-- Launcher feature and Manifest V3 migration: this fork.
-
-Released under the **MIT License** (see `LICENSE`), preserving the original
-copyright © 2025 Magdy Saleh.
+- Released under the **MIT License** (see `LICENSE`), preserving the original
+  copyright © 2025 Magdy Saleh.
