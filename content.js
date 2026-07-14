@@ -303,13 +303,19 @@
         const found = [];
         const push = (el) => { if (el && found.indexOf(el) === -1) found.push(el); };
 
+        // A top-of-viewport bar is anything whose top edge is at or above the
+        // bottom of our launcher bar. That means: it currently overlaps our bar
+        // (top < bar, needs pushing down) OR it's already parked at bar height.
+        // Widened from the old "top ≈ 0" test, which missed navs that sit at a
+        // small non-zero offset (e.g. under a LinkedIn alert strip).
+        const isTopBar = (r) => r.top < bar + 4;
+
         // (a) Explicit catch for LinkedIn's known nav ids/classes (confirmed:
         // header#global-nav + div.global-nav__a11y-menu), regardless of size.
         document.querySelectorAll('#global-nav, [class*="global-nav"]').forEach(el => {
             const pos = getComputedStyle(el).position;
             if (pos === 'fixed' || pos === 'sticky') {
-                const r = el.getBoundingClientRect();
-                if (r.top <= 1 || Math.abs(r.top - bar) < 2) push(el);
+                if (isTopBar(el.getBoundingClientRect())) push(el);
             }
         });
 
@@ -324,8 +330,7 @@
             const r = el.getBoundingClientRect();
             if (r.width < vw * 0.6) continue;              // exclude side/narrow widgets
             if (r.height > 140) continue;                  // exclude full-page overlays
-            const pinnedTop = r.top <= 1 || Math.abs(r.top - bar) < 2;
-            if (!pinnedTop) continue;                      // exclude bottom/mid bars
+            if (!isTopBar(r)) continue;                    // exclude bottom/mid bars
             push(el);
         }
         return found;
@@ -452,5 +457,5 @@
         init();
     }
 
-    console.log('Minimal LinkedIn: active (build 2.1)');
+    console.log('Minimal LinkedIn: active (build 2.2)');
 })();
