@@ -282,17 +282,8 @@
     // every tick because LinkedIn re-renders can reset inline styles. If this
     // ever stops working, the nav overlap is the only regression and this is
     // the function to update.
-    // Class-name hints, tried first for speed; the geometry scan below is the
-    // real safety net and works even if every one of these is renamed.
-    const NAV_SELECTORS = [
-        '#global-nav',
-        '.global-nav',
-        '[class*="global-nav"]',
-        'header[role="banner"]',
-        'header',
-        'nav',
-    ];
     const watchedNavs = new WeakSet(); // navs we've attached an observer to
+    let topNavs = [];                  // cached nav elements (see scanTopNavs)
 
     function setNavTop(el) {
         if (getComputedStyle(el).top !== CONFIG.barHeight + 'px') {
@@ -300,27 +291,42 @@
         }
     }
 
-    // Offset EVERY full-width fixed/sticky bar pinned to the very top (not just
-    // the first match — LinkedIn's real nav isn't always the first candidate).
-    // Geometry-based, so it doesn't depend on class names. The width + top gates
-    // exclude the bottom-right messaging widget and side rails. Each matched nav
-    // also gets a scoped attribute observer, because LinkedIn resets the nav's
-    // top via a style/class change WITHOUT a childList mutation, which the
-    // page-wide childList observer would otherwise miss.
-    function offsetTopNav() {
+    // Find LinkedIn's top nav purely by GEOMETRY — no tag/class assumptions.
+    // Any element that is fixed/sticky, spans most of the width, is short (a
+    // bar, not a full-page overlay/modal), and is pinned to the very top is
+    // treated as a nav to push below our bar. This is tag/class agnostic, so it
+    // survives LinkedIn renaming or restructuring the nav. Excludes our own bar
+    // and the bottom-right messaging widget.
+    function scanTopNavs() {
         const vw = window.innerWidth;
         const bar = CONFIG.barHeight;
-        const seen = new Set();
-        NAV_SELECTORS.forEach(sel => {
-            document.querySelectorAll(sel).forEach(el => {
-                if (seen.has(el)) return;
-                seen.add(el);
-                const pos = getComputedStyle(el).position;
-                if (pos !== 'fixed' && pos !== 'sticky') return;
-                const r = el.getBoundingClientRect();
-                const spansWidth = r.width >= vw * 0.6;
-                const pinnedTop = r.top <= 1 || Math.abs(r.top - bar) < 2;
-                if (!spansWidth || !pinnedTop) return;
+        const found = [];
+        const all = document.body ? document.body.getElementsByTagName('*') : [];
+        for (let i = 0; i < all.length; i++) {
+            const el = all[i];
+            if (el.id === HOST_ID) continue;               // never move ourselves
+            const c = getComputedStyle(el);
+            if (c.position !== 'fixed' && c.position !== 'sticky') continue;
+            const r = el.getBoundingClientRect();
+            if (r.width < vw * 0.6) continue;              // exclude side/narrow widgets
+            if (r.height > 140) continue;                  // exclude full-page overlays
+            const pinnedTop = r.top <= 1 || Math.abs(r.top - bar) < 2;
+            if (!pinnedTop) continue;                      // exclude bottom/mid bars
+            found.push(el);
+        }
+        return found;
+    }
+
+    // Re-assert the offset. The full DOM scan only runs when the cache is empty
+    // or a cached nav was detached (e.g. LinkedIn swapped the node on SPA nav);
+    // otherwise we just cheaply re-pin the cached elements. Each nav also gets a
+    // scoped attribute observer, because LinkedIn resets the nav's top via a
+    // style/class change WITHOUT a childList mutation, which the page-wide
+    // childList observer would otherwise miss.
+    function offsetTopNav() {
+        if (!topNavs.length || topNavs.some(el => !el.isConnected)) {
+            topNavs = scanTopNavs();
+            topNavs.forEach(el => {
                 setNavTop(el);
                 if (!watchedNavs.has(el)) {
                     watchedNavs.add(el);
@@ -329,7 +335,9 @@
                     }).observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
                 }
             });
-        });
+        } else {
+            topNavs.forEach(setNavTop);
+        }
     }
 
     // Re-assert the offset several times right after a route change, to win the
