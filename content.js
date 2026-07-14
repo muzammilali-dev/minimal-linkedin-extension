@@ -86,7 +86,7 @@
                 color: #666666;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             ">
-                <div style="font-size: 30px; line-height: 1; margin-bottom: 10px;">📵</div>
+                <div aria-label="Minimal LinkedIn" style="font-weight: 700; font-size: 26px; letter-spacing: -0.3px; color: #1d2226; margin-bottom: 12px;">M<span style="display: inline-block; background: #0a66c2; color: #ffffff; border-radius: 4px; padding: 1px 5px; margin: 0 1px;">in</span>imal</div>
                 <h2 style="color: #0a66c2; margin: 0 0 8px; font-size: 18px;">Feed hidden</h2>
                 <p style="margin: 0;">Your LinkedIn feed is hidden to help you stay focused.</p>
                 <p style="margin: 8px 0 0; font-size: 13px;">Messages are in the top nav; games are in “Today’s puzzles” on the right. →</p>
@@ -123,5 +123,5 @@
         start();
     }
 
-    console.log('Minimal LinkedIn: active (build 3.1)');
+    console.log('Minimal LinkedIn: active (build 3.2)');
 })();
