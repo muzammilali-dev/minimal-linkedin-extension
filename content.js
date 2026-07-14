@@ -21,11 +21,14 @@
         return p === '/' || p === '/feed' || p === '/feed/';
     }
 
-    // CSS that hides the center feed column. Uses :has() so it targets the feed
+    // CSS that blanks the center feed column. Uses :has() so it targets the feed
     // <section> purely by structure — "a column row that has an <aside> child,
-    // hide its <section> child" — independent of element order or class names.
-    // Injected at document_start so the feed never flashes before our JS runs.
-    const FEED_HIDE_CSS = 'main :has(> aside) > section { display: none !important; }';
+    // blank its <section>'s contents" — independent of element order or classes.
+    // We hide the section's children (not the section itself) so the column
+    // stays in the layout and can hold our "feed hidden" note. Injected at
+    // document_start so the feed never flashes before our JS runs.
+    const FEED_HIDE_CSS =
+        'main :has(> aside) > section > *:not(.mll-note){display:none!important}';
 
     function setFeedHideStyle() {
         const existing = document.getElementById(FEEDHIDE_STYLE_ID);
@@ -44,10 +47,10 @@
     // Apply immediately at document_start (before the feed paints).
     setFeedHideStyle();
 
-    // JS backup for the CSS above: structurally hide the center feed <section>
-    // (a <section> whose parent row also contains an <aside> rail). Keeps the
-    // rails and nav untouched. Runs on every re-render / route change so it
-    // survives LinkedIn's single-page-app navigation.
+    // JS backup for the CSS above: find the center feed <section> (a <section>
+    // whose parent row also contains an <aside> rail), blank its contents, and
+    // show our note. Keeps the rails and nav untouched. Runs on every re-render
+    // / route change so it survives LinkedIn's single-page-app navigation.
     function hideFeed() {
         setFeedHideStyle(); // keep the anti-flash rule in sync with the route
         if (!isFeedPath()) return;
@@ -56,9 +59,40 @@
         main.querySelectorAll('section').forEach(section => {
             const parent = section.parentElement;
             if (parent && parent.querySelector(':scope > aside')) {
-                section.style.setProperty('display', 'none', 'important');
+                // Center feed column: hide its real contents, then show our note
+                // (kept in place so the note occupies the middle column).
+                Array.from(section.children).forEach(child => {
+                    if (!child.classList.contains('mll-note')) {
+                        child.style.setProperty('display', 'none', 'important');
+                    }
+                });
+                addNote(section);
             }
         });
+    }
+
+    // Friendly "feed hidden" note shown where the feed used to be.
+    function addNote(section) {
+        if (section.querySelector(':scope > .mll-note')) return;
+        const note = document.createElement('div');
+        note.className = 'mll-note';
+        note.innerHTML = `
+            <div style="
+                text-align: center;
+                padding: 40px 24px;
+                background: #ffffff;
+                border: 1px solid #e0dfdc;
+                border-radius: 8px;
+                color: #666666;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            ">
+                <div style="font-size: 30px; line-height: 1; margin-bottom: 10px;">📵</div>
+                <h2 style="color: #0a66c2; margin: 0 0 8px; font-size: 18px;">Feed hidden</h2>
+                <p style="margin: 0;">Your LinkedIn feed is hidden to help you stay focused.</p>
+                <p style="margin: 8px 0 0; font-size: 13px;">Messages are in the top nav; games are in “Today’s puzzles” on the right. →</p>
+            </div>
+        `;
+        section.appendChild(note);
     }
 
     // --- SPA handling -------------------------------------------------------
@@ -89,5 +123,5 @@
         start();
     }
 
-    console.log('Minimal LinkedIn: active (build 3.0)');
+    console.log('Minimal LinkedIn: active (build 3.1)');
 })();
