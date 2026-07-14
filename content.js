@@ -275,87 +275,60 @@
         (document.head || document.documentElement).appendChild(offset);
     }
 
-    // Move LinkedIn's fixed top nav down so it isn't hidden behind our bar.
-    // This is the one place we touch LinkedIn's own chrome: we try several
-    // reasonably stable selectors and only nudge an element that is actually
-    // fixed/sticky (so we never shift unrelated in-flow elements). Re-applied
-    // every tick because LinkedIn re-renders can reset inline styles. If this
-    // ever stops working, the nav overlap is the only regression and this is
-    // the function to update.
-    const watchedNavs = new WeakSet(); // navs we've attached an observer to
-    let topNavs = [];                  // cached nav elements (see scanTopNavs)
+    // Move LinkedIn's top nav below our bar. Purely GEOMETRY-driven — no tag,
+    // id, or class assumptions (LinkedIn changes those). We look for any
+    // fixed/sticky element that spans most of the width, is short (a bar, not a
+    // full-page overlay), and currently OVERLAPS our bar, then shove it down
+    // with `margin-top` (which shifts a fixed/sticky element regardless of how
+    // it's positioned — `top`, `transform`, flex, whatever). Idempotent: once an
+    // element sits at bar height it no longer overlaps, so we stop touching it
+    // (important — otherwise we'd keep pushing a sticky nav that html
+    // padding-top already handled). A scoped attribute observer re-applies our
+    // margin if LinkedIn resets the element's style/class.
+    const OFFSET_MARK = 'mllNavOffset';
+    let navDebugLogged = false;
 
-    function setNavTop(el) {
-        if (getComputedStyle(el).top !== CONFIG.barHeight + 'px') {
-            el.style.setProperty('top', CONFIG.barHeight + 'px', 'important');
+    function reassertMargin(el) {
+        const want = CONFIG.barHeight + 'px';
+        if (el.style.marginTop !== want) {
+            el.style.setProperty('margin-top', want, 'important');
         }
     }
 
-    // Find LinkedIn's top nav purely by GEOMETRY — no tag/class assumptions.
-    // Any element that is fixed/sticky, spans most of the width, is short (a
-    // bar, not a full-page overlay/modal), and is pinned to the very top is
-    // treated as a nav to push below our bar. This is tag/class agnostic, so it
-    // survives LinkedIn renaming or restructuring the nav. Excludes our own bar
-    // and the bottom-right messaging widget.
-    function scanTopNavs() {
+    function offsetTopNav() {
         const vw = window.innerWidth;
+        const vh = window.innerHeight;
         const bar = CONFIG.barHeight;
-        const found = [];
-        const push = (el) => { if (el && found.indexOf(el) === -1) found.push(el); };
-
-        // A top-of-viewport bar is anything whose top edge is at or above the
-        // bottom of our launcher bar. That means: it currently overlaps our bar
-        // (top < bar, needs pushing down) OR it's already parked at bar height.
-        // Widened from the old "top ≈ 0" test, which missed navs that sit at a
-        // small non-zero offset (e.g. under a LinkedIn alert strip).
-        const isTopBar = (r) => r.top < bar + 4;
-
-        // (a) Explicit catch for LinkedIn's known nav ids/classes (confirmed:
-        // header#global-nav + div.global-nav__a11y-menu), regardless of size.
-        document.querySelectorAll('#global-nav, [class*="global-nav"]').forEach(el => {
-            const pos = getComputedStyle(el).position;
-            if (pos === 'fixed' || pos === 'sticky') {
-                if (isTopBar(el.getBoundingClientRect())) push(el);
-            }
-        });
-
-        // (b) Geometry safety net — any short, full-width, top-pinned fixed bar,
-        // even if LinkedIn renames everything (tag/class agnostic).
+        const maxBarHeight = Math.min(240, vh * 0.4); // exclude full-page overlays
+        const offset = [];
         const all = document.body ? document.body.getElementsByTagName('*') : [];
         for (let i = 0; i < all.length; i++) {
             const el = all[i];
-            if (el.id === HOST_ID) continue;               // never move ourselves
+            if (el.id === HOST_ID) continue;                 // never move ourselves
             const c = getComputedStyle(el);
             if (c.position !== 'fixed' && c.position !== 'sticky') continue;
             const r = el.getBoundingClientRect();
-            if (r.width < vw * 0.6) continue;              // exclude side/narrow widgets
-            if (r.height > 140) continue;                  // exclude full-page overlays
-            if (!isTopBar(r)) continue;                    // exclude bottom/mid bars
-            push(el);
+            if (r.width < vw * 0.5) continue;                // not a full-width bar
+            if (r.height > maxBarHeight) continue;           // not a bar (overlay/modal)
+            if (r.top >= bar - 2) continue;                  // not overlapping our bar
+            // Overlapping top bar → push it down by our height.
+            reassertMargin(el);
+            offset.push(el);
+            if (el.dataset[OFFSET_MARK] !== '1') {
+                el.dataset[OFFSET_MARK] = '1';
+                new MutationObserver(() => {
+                    if (el.isConnected) reassertMargin(el);
+                }).observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
+            }
         }
-        return found;
-    }
-
-    // Re-assert the offset. The full DOM scan only runs when the cache is empty
-    // or a cached nav was detached (e.g. LinkedIn swapped the node on SPA nav);
-    // otherwise we just cheaply re-pin the cached elements. Each nav also gets a
-    // scoped attribute observer, because LinkedIn resets the nav's top via a
-    // style/class change WITHOUT a childList mutation, which the page-wide
-    // childList observer would otherwise miss.
-    function offsetTopNav() {
-        if (!topNavs.length || topNavs.some(el => !el.isConnected)) {
-            topNavs = scanTopNavs();
-            topNavs.forEach(el => {
-                setNavTop(el);
-                if (!watchedNavs.has(el)) {
-                    watchedNavs.add(el);
-                    new MutationObserver(() => {
-                        if (el.isConnected) setNavTop(el);
-                    }).observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
-                }
-            });
-        } else {
-            topNavs.forEach(setNavTop);
+        // One-time success diagnostic (build 2.3): latches only once we actually
+        // offset something. The "nothing found" case is reported by a timer in
+        // init() so an early empty scan doesn't latch prematurely.
+        if (!navDebugLogged && offset.length) {
+            navDebugLogged = true;
+            console.log('Minimal LinkedIn: offset top nav element(s):',
+                offset.map(e => e.tagName + (e.id ? '#' + e.id : '') +
+                    ' .' + (e.className || '').toString().trim().split(/\s+/)[0]).join(', '));
         }
     }
 
@@ -449,6 +422,15 @@
             hideFeed();
             preserveImportantElements();
         }, 2000);
+
+        // Failure diagnostic: if after a few seconds we still never found an
+        // overlapping top bar to offset, say so (build 2.3).
+        setTimeout(() => {
+            if (!navDebugLogged) {
+                console.log('Minimal LinkedIn: no overlapping top bar found to offset — ' +
+                    'the nav may not be fixed/sticky, or is wider/taller than the gates expect.');
+            }
+        }, 4000);
     }
 
     if (document.readyState === 'loading') {
@@ -457,5 +439,5 @@
         init();
     }
 
-    console.log('Minimal LinkedIn: active (build 2.2)');
+    console.log('Minimal LinkedIn: active (build 2.3)');
 })();
